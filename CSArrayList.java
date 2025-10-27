@@ -2,6 +2,9 @@
 import java.util.Arrays;
 import java.util.AbstractList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+import java.util.ConcurrentModificationException;
 
 /**
  *  This class implements some of the methods of the Java
@@ -64,11 +67,12 @@ public class CSArrayList<E>
     public boolean add(E anEntry) {
         // if the size is equal to capacity we must first allocate a new array to hold the data and then copy the data to this new array with method reallocate
         if (size == capacity) {
-            reallocate();
+            reallocate(); //allocate bigger array and copy elements
         }
-        theData[size] = anEntry;
-        size++;
-        return true;
+        theData[size] = anEntry; //write at the tail
+        size++; //logical size increases
+        modCount++; //structural change: must be observed
+        return true; //match Collection
     }
 
     /**
@@ -81,15 +85,16 @@ public class CSArrayList<E>
             throw new ArrayIndexOutOfBoundsException(index);
         }
         if (size == capacity) {
-            reallocate();
+            reallocate(); //ensure space for one more
         }
         // Shift data in elements from index to size - 1
         for (int i = size; i > index; i--) {
             theData[i] = theData[i - 1];
         }
         // Insert the new item.
-        theData[index] = anEntry;
-        size++;
+        theData[index] = anEntry; //write new value into the opened slot
+        size++; //list grew by one
+        modCount++; //structual moidification
     }
     /**
      * Get a value in the array based on its index.
@@ -144,6 +149,7 @@ public class CSArrayList<E>
             theData[i - 1] = theData[i];
         }
         size--;
+        modCount++;
         return returnValue;
     }
 
@@ -174,14 +180,62 @@ public class CSArrayList<E>
     @Override
     public int indexOf(Object item) {
         for (int i = 0; i < size; i++) {
-            if (theData[i] == null && item == null) {
-                return i;
+            if (item == null){
+                if (theData[i] == null) {
+                    return i;
+                }
+                }
+                else {
+                    if (item.equals(theData[i])){
+                        return i;
+                    }
+                }
             }
-            if (theData[i].equals(item)) {
-                return i;
-            }
-        }
         return -1;
+    }
+    @Override
+    public boolean remove(Object o) {
+        int idx = indexOf(o);
+        if (idx < 0) return false;
+        remove(idx);
+        return true;
+    }
+    @Override
+    public java.util.Iterator<E> iterator (){
+        return new Itr();
+    }
+    private class Itr implements Iterator<E> {
+        int cursor = 0;
+        int lastRet = -1;
+        int expectedModCount = modCount;
+
+        @Override
+        public boolean hasNext() {
+            return cursor < size;
+        }
+
+        @Override
+        public E next() {
+            checkForComodification();
+            if (cursor >= size) throw new NoSuchElementException();
+            lastRet = cursor++;
+            return theData[lastRet];
+        }
+
+        @Override
+        public void remove() {
+            if (lastRet < 0) throw new IllegalStateException();
+            checkForComodification();
+            CSArrayList.this.remove(lastRet);
+            cursor = lastRet;
+            lastRet = -1;
+            expectedModCount = modCount;
+        }
+
+        final void checkForComodification() {
+            if (modCount != expectedModCount)
+                throw new ConcurrentModificationException();
+        }
     }
 }
 
